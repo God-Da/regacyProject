@@ -11,9 +11,9 @@
         VALUES (#{title}, #{content}, #{writer}, NOW(), NOW())
     </insert>
 
-    <!-- 첨부파일 이미지 개별 등록 -->
+    <!-- 첨부파일 이미지 개별 등록 (file_name -> fileName) -->
     <insert id="insertImage">
-        INSERT INTO board_image (uuid, file_name, ord, board_bno)
+        INSERT INTO board_image (uuid, fileName, ord, board_bno)
         VALUES (#{uuid}, #{fileName}, #{ord}, #{board_bno})
     </insert>
 
@@ -24,7 +24,7 @@
         WHERE bno = #{bno}
     </select>
 
-    <!-- 3. 이미지 포함 단건 조회 (1:N collection 매핑) -->
+    <!-- 3. 이미지 포함 단건 조회 (1:N collection 매핑, i.file_name -> i.fileName) -->
     <resultMap id="boardWithImagesMap" type="kr.or.oti.b01.dto.BoardDTO">
         <id property="bno" column="bno" />
         <result property="title" column="title" />
@@ -40,7 +40,7 @@
     <select id="selectOneWithImages" resultMap="boardWithImagesMap">
         SELECT 
             b.bno, b.title, b.content, b.writer, b.regDate, b.modDate,
-            CONCAT(i.uuid, '_', i.file_name) AS image_file
+            CONCAT(i.uuid, '_', i.fileName) AS image_file
         FROM board b
         LEFT JOIN board_image i ON b.bno = i.board_bno
         WHERE b.bno = #{bno}
@@ -100,7 +100,7 @@
         LIMIT #{skip}, #{size}
     </select>
 
-    <!-- 8. 이미지 + 댓글 수 포함 ResultMap (1:N BoardImageDTO 매핑) -->
+    <!-- 8. 이미지 + 댓글 수 포함 ResultMap (column="fileName") -->
     <resultMap id="boardListAllMap" type="kr.or.oti.b01.dto.BoardListAllDTO">
         <id property="bno" column="bno" />
         <result property="title" column="title" />
@@ -109,11 +109,12 @@
         <result property="replyCount" column="replyCount" />
         <collection property="boardImages" ofType="kr.or.oti.b01.dto.BoardImageDTO">
             <result property="uuid" column="uuid" />
-            <result property="fileName" column="file_name" />
+            <result property="fileName" column="fileName" />
             <result property="ord" column="ord" />
         </collection>
     </resultMap>
 
+    <!-- bi.file_name -> bi.fileName 으로 변경 -->
     <select id="selectListWithAll" resultMap="boardListAllMap">
         SELECT 
             sub.bno, 
@@ -122,7 +123,7 @@
             sub.regDate, 
             sub.replyCount,
             bi.uuid, 
-            bi.file_name, 
+            bi.fileName, 
             bi.ord
         FROM (
             SELECT 
