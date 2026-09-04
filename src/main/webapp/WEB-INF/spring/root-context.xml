@@ -1,8 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
-	
-	<!-- Root Context: defines shared resources visible to all other web components -->
-		
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mybatis-spring="http://mybatis.org/schema/mybatis-spring"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd
+		http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring.xsd
+		http://www.springframework.org/schema/tx https://www.springframework.org/schema/tx/spring-tx.xsd">
+
+	<!-- 1. HikariCP DataSource -->
+	<bean id="hikariConfig" class="com.zaxxer.hikari.HikariConfig">
+		<property name="driverClassName"
+			value="org.mariadb.jdbc.Driver" />
+		<property name="jdbcUrl"
+			value="jdbc:mariadb://localhost:23306/kosa_db" />
+		<property name="username" value="root" />
+		<property name="password" value="kosa1004" />
+		<property name="maximumPoolSize" value="10" />
+		<property name="minimumIdle" value="5" />
+	</bean>
+
+	<bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource"
+		destroy-method="close">
+		<constructor-arg ref="hikariConfig" />
+	</bean>
+
+	<!-- 2. MyBatis SqlSessionFactoryBean 등록 -->
+	<bean id="sqlSessionFactory"
+		class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<!-- XML 매퍼 파일 위치 (src/main/resources/mappers/*.xml) -->
+		<property name="mapperLocations"
+			value="classpath:/mappers/**/*.xml" />
+		<!-- DTO 별칭 패키지 (XML에서 긴 패키지명 생략 가능) -->
+		<property name="typeAliasesPackage" value="kr.or.oti.b01.dto" />
+	</bean>
+
+	<!-- 3. 트랜잭션 관리자 설정 (@Transactional 활성화) -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	<tx:annotation-driven
+		transaction-manager="transactionManager" />
+
+	<!-- 4. Mapper 인터페이스 자동 스캔 (MyBatis 인터페이스가 있는 곳) -->
+	<mybatis-spring:scan
+		base-package="kr.or.oti.b01.mapper" />
+
+	<!-- 5. Service 및 컴포넌트 스캔 (Controller는 servlet-context에서 잡으므로 제외) -->
+	<context:component-scan
+		base-package="kr.or.oti.b01">
+		<context:exclude-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" />
+	</context:component-scan>
+
+
 </beans>

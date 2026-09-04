@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.oti.b01.mapper.ReplyMapper">
+
+    <!-- 댓글 등록 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="rno">
+        INSERT INTO reply (replyText, replyer, board_bno, regDate, modDate)
+        VALUES (#{replyText}, #{replyer}, #{bno}, NOW(), NOW())
+    </insert>
+
+    <!-- 댓글 단건 조회 -->
+    <select id="selectOne" resultType="kr.or.oti.b01.dto.ReplyDTO">
+        SELECT rno, replyText, replyer, board_bno AS bno, regDate, modDate
+        FROM reply
+        WHERE rno = #{rno}
+    </select>
+
+    <!-- 댓글 수정 -->
+    <update id="update">
+        UPDATE reply
+        SET replyText = #{replyText},
+            modDate = NOW()
+        WHERE rno = #{rno}
+    </update>
+
+    <!-- 댓글 삭제 -->
+    <delete id="delete">
+        DELETE FROM reply 
+        WHERE rno = #{rno}
+    </delete>
+
+    <!-- 특정 게시글의 댓글 목록 페이징 -->
+    <select id="selectListOfBoard" resultType="kr.or.oti.b01.dto.ReplyDTO">
+        SELECT rno, replyText, replyer, board_bno AS bno, regDate, modDate
+        FROM reply
+        WHERE board_bno = #{bno}
+        ORDER BY rno ASC
+        LIMIT #{pageRequestDTO.skip}, #{pageRequestDTO.size}
+    </select>
+
+    <!-- 특정 게시글의 댓글 수 카운트 -->
+    <select id="getCountOfBoard" resultType="int">
+        SELECT COUNT(rno) 
+        FROM reply 
+        WHERE board_bno = #{bno}
+    </select>
+
+    <!-- 게시글 번호 기준 댓글 일괄 삭제 -->
+    <delete id="deleteByBoardBno">
+        DELETE FROM reply 
+        WHERE board_bno = #{bno}
+    </delete>
+
+</mapper>

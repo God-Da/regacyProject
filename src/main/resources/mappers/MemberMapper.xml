@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.oti.b01.mapper.MemberMapper">
+
+    <!-- 아이디 중복 체크 -->
+    <select id="checkMid" resultType="int">
+        SELECT COUNT(mid) FROM member WHERE mid = #{mid}
+    </select>
+
+    <!-- 회원 등록 -->
+    <insert id="insert">
+        INSERT INTO member (mid, mpw, email, del, social, regDate, modDate)
+        VALUES (#{mid}, #{mpw}, #{email}, false, false, NOW(), NOW())
+    </insert>
+
+    <!-- 권한 등록 -->
+    <insert id="insertRole">
+        INSERT INTO member_role_set (member_mid, role_set)
+        VALUES (#{mid}, #{role})
+    </insert>
+
+    <!-- MemberListDTO 매핑 (roleSet: Set<String>) -->
+    <resultMap id="memberListDTOMap" type="kr.or.oti.b01.dto.MemberListDTO">
+        <id property="mid" column="mid" />
+        <result property="mpw" column="mpw" />
+        <result property="email" column="email" />
+        <result property="del" column="del" />
+        <result property="social" column="social" />
+        <result property="regDate" column="regDate" />
+        <result property="modDate" column="modDate" />
+        <collection property="roleSet" ofType="string">
+            <result column="role_set" />
+        </collection>
+    </resultMap>
+
+    <!-- 단건 조회 -->
+    <select id="selectOne" resultMap="memberListDTOMap">
+        SELECT m.mid, m.mpw, m.email, m.del, m.social, m.regDate, m.modDate, r.role_set
+        FROM member m
+        LEFT JOIN member_role_set r ON m.mid = r.member_mid
+        WHERE m.mid = #{mid}
+    </select>
+
+    <!-- 시큐리티용 단건 조회 -->
+    <resultMap id="memberWithRolesMap" type="kr.or.oti.b01.dto.MemberInfoDTO">
+        <id property="mid" column="mid" />
+        <result property="mpw" column="mpw" />
+        <result property="email" column="email" />
+        <result property="del" column="del" />
+        <result property="social" column="social" />
+        <result property="regDate" column="regDate" />
+        <result property="modDate" column="modDate" />
+        <collection property="roleSet" ofType="string">
+            <result column="role_set" />
+        </collection>
+    </resultMap>
+
+    <select id="selectWithRoles" resultMap="memberWithRolesMap">
+        SELECT m.mid, m.mpw, m.email, m.del, m.social, m.regDate, m.modDate, r.role_set
+        FROM member m
+        LEFT JOIN member_role_set r ON m.mid = r.member_mid
+        WHERE m.mid = #{mid}
+    </select>
+
+    <select id="selectByEmailWithRoles" resultMap="memberWithRolesMap">
+        SELECT m.mid, m.mpw, m.email, m.del, m.social, m.regDate, m.modDate, r.role_set
+        FROM member m
+        LEFT JOIN member_role_set r ON m.mid = r.member_mid
+        WHERE m.email = #{email}
+    </select>
+
+    <!-- 회원 정보 수정 -->
+    <update id="update">
+        UPDATE member
+        SET email = #{email},
+            modDate = NOW()
+        WHERE mid = #{mid}
+    </update>
+
+    <!-- 탈퇴 처리 -->
+    <update id="updateDel">
+        UPDATE member
+        SET del = #{del},
+            modDate = NOW()
+        WHERE mid = #{mid}
+    </update>
+
+    <!-- 권한 삭제 -->
+    <delete id="deleteRoles">
+        DELETE FROM member_role_set WHERE member_mid = #{mid}
+    </delete>
+
+    <!-- 전체 조회 -->
+    <select id="selectAll" resultMap="memberListDTOMap">
+        SELECT m.mid, m.email, m.del, m.social, r.role_set
+        FROM member m
+        LEFT JOIN member_role_set r ON m.mid = r.member_mid
+        ORDER BY m.mid ASC
+    </select>
+
+    <!-- 검색 및 페이징 조회 -->
+    <select id="selectList" resultMap="memberListDTOMap">
+        SELECT sub.mid, sub.email, sub.del, sub.social, r.role_set
+        FROM (
+            SELECT mid, email, del, social
+            FROM member
+            <where>
+                <if test="keyword != null and keyword != ''">
+                    mid LIKE CONCAT('%', #{keyword}, '%') 
+                    OR email LIKE CONCAT('%', #{keyword}, '%')
+                </if>
+            </where>
+            ORDER BY mid ASC
+            LIMIT #{skip}, #{size}
+        ) sub
+        LEFT JOIN member_role_set r ON sub.mid = r.member_mid
+        ORDER BY sub.mid ASC
+    </select>
+
+    <!-- 총 회원 수 -->
+    <select id="getCount" resultType="int">
+        SELECT COUNT(mid) 
+        FROM member
+        <where>
+            <if test="keyword != null and keyword != ''">
+                mid LIKE CONCAT('%', #{keyword}, '%') 
+                OR email LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+    </select>
+
+</mapper>

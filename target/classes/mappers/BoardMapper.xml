@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.oti.b01.mapper.BoardMapper">
+
+    <!-- 1. 등록 (PK bno 자동 할당) -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="bno">
+        INSERT INTO board (title, content, writer, regDate, modDate)
+        VALUES (#{title}, #{content}, #{writer}, NOW(), NOW())
+    </insert>
+
+    <!-- 첨부파일 이미지 개별 등록 -->
+    <insert id="insertImage">
+        INSERT INTO board_image (uuid, file_name, ord, board_bno)
+        VALUES (#{uuid}, #{fileName}, #{ord}, #{board_bno})
+    </insert>
+
+    <!-- 2. 단건 조회 (기본) -->
+    <select id="selectOne" resultType="kr.or.oti.b01.dto.BoardDTO">
+        SELECT bno, title, content, writer, regDate, modDate
+        FROM board
+        WHERE bno = #{bno}
+    </select>
+
+    <!-- 3. 이미지 포함 단건 조회 (1:N collection 매핑) -->
+    <resultMap id="boardWithImagesMap" type="kr.or.oti.b01.dto.BoardDTO">
+        <id property="bno" column="bno" />
+        <result property="title" column="title" />
+        <result property="content" column="content" />
+        <result property="writer" column="writer" />
+        <result property="regDate" column="regDate" />
+        <result property="modDate" column="modDate" />
+        <collection property="fileNames" ofType="string">
+            <result column="image_file" />
+        </collection>
+    </resultMap>
+
+    <select id="selectOneWithImages" resultMap="boardWithImagesMap">
+        SELECT 
+            b.bno, b.title, b.content, b.writer, b.regDate, b.modDate,
+            CONCAT(i.uuid, '_', i.file_name) AS image_file
+        FROM board b
+        LEFT JOIN board_image i ON b.bno = i.board_bno
+        WHERE b.bno = #{bno}
+        ORDER BY i.ord ASC
+    </select>
+
+    <!-- 4. 수정 및 삭제 -->
+    <update id="update">
+        UPDATE board
+        SET title = #{title}, content = #{content}, modDate = NOW()
+        WHERE bno = #{bno}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM board WHERE bno = #{bno}
+    </delete>
+
+    <delete id="deleteImages">
+        DELETE FROM board_image WHERE board_bno = #{bno}
+    </delete>
+
+    <!-- 5. 동적 검색 공통 조각 -->
+    <sql id="search">
+        <where>
+            b.bno > 0
+            <if test="types != null and types.length > 0 and keyword != null and keyword != ''">
+                AND
+                <foreach item="type" collection="types" open="(" close=")" separator=" OR ">
+                    <if test="type == 't'.toString()">b.title LIKE CONCAT('%', #{keyword}, '%')</if>
+                    <if test="type == 'c'.toString()">b.content LIKE CONCAT('%', #{keyword}, '%')</if>
+                    <if test="type == 'w'.toString()">b.writer LIKE CONCAT('%', #{keyword}, '%')</if>
+                </foreach>
+            </if>
+        </where>
+    </sql>
+
+    <!-- 6. 단순 목록 페이징 -->
+    <select id="selectList" resultType="kr.or.oti.b01.dto.BoardDTO">
+        SELECT b.bno, b.title, b.content, b.writer, b.regDate, b.modDate
+        FROM board b
+        <include refid="search" />
+        ORDER BY b.bno DESC
+        LIMIT #{skip}, #{size}
+    </select>
+
+    <!-- 7. 댓글 수 포함 목록 조회 -->
+    <select id="selectListWithReplyCount" resultType="kr.or.oti.b01.dto.BoardListReplyCountDTO">
+        SELECT 
+            b.bno, 
+            b.title, 
+            b.writer, 
+            b.regDate,
+            (SELECT COUNT(r.rno) FROM reply r WHERE r.board_bno = b.bno) AS replyCount
+        FROM board b
+        <include refid="search" />
+        ORDER BY b.bno DESC
+        LIMIT #{skip}, #{size}
+    </select>
+
+    <!-- 8. 이미지 + 댓글 수 포함 ResultMap (1:N BoardImageDTO 매핑) -->
+    <resultMap id="boardListAllMap" type="kr.or.oti.b01.dto.BoardListAllDTO">
+        <id property="bno" column="bno" />
+        <result property="title" column="title" />
+        <result property="writer" column="writer" />
+        <result property="regDate" column="regDate" />
+        <result property="replyCount" column="replyCount" />
+        <collection property="boardImages" ofType="kr.or.oti.b01.dto.BoardImageDTO">
+            <result property="uuid" column="uuid" />
+            <result property="fileName" column="file_name" />
+            <result property="ord" column="ord" />
+        </collection>
+    </resultMap>
+
+    <select id="selectListWithAll" resultMap="boardListAllMap">
+        SELECT 
+            sub.bno, 
+            sub.title, 
+            sub.writer, 
+            sub.regDate, 
+            sub.replyCount,
+            bi.uuid, 
+            bi.file_name, 
+            bi.ord
+        FROM (
+            SELECT 
+                b.bno, 
+                b.title, 
+                b.writer, 
+                b.regDate,
+                (SELECT COUNT(r.rno) FROM reply r WHERE r.board_bno = b.bno) AS replyCount
+            FROM board b
+            <include refid="search" />
+            ORDER BY b.bno DESC
+            LIMIT #{skip}, #{size}
+        ) sub
+        LEFT JOIN board_image bi ON sub.bno = bi.board_bno
+        ORDER BY sub.bno DESC, bi.ord ASC
+    </select>
+
+    <!-- 9. 총 데이터 수 카운트 -->
+    <select id="getCount" resultType="int">
+        SELECT COUNT(b.bno)
+        FROM board b
+        <include refid="search" />
+    </select>
+
+    <!-- 10. 선택 삭제 및 전체 삭제 -->
+    <delete id="deleteSelected">
+        DELETE FROM board WHERE bno IN
+        <foreach item="bno" collection="bnos" open="(" separator="," close=")">
+            #{bno}
+        </foreach>
+    </delete>
+
+    <delete id="deleteSelectedImages">
+        DELETE FROM board_image WHERE board_bno IN
+        <foreach item="bno" collection="bnos" open="(" separator="," close=")">
+            #{bno}
+        </foreach>
+    </delete>
+
+    <delete id="deleteAll">
+        DELETE FROM board
+    </delete>
+
+    <delete id="deleteAllImages">
+        DELETE FROM board_image
+    </delete>
+
+</mapper>
